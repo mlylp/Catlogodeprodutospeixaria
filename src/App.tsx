@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Fish, Shell, Waves, ShoppingCart, Phone, MapPin, Clock, Mail, Trash2 } from 'lucide-react';
+import { Fish, Shell, Waves, ShoppingCart, Phone, MapPin, Clock, Mail, Trash2, Settings } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 import { ProductCard } from './components/ProductCard';
 import { Badge } from './components/ui/badge';
@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Separator } from './components/ui/separator';
 import { CheckoutDialog } from './components/CheckoutDialog';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
+import { AdminPanel } from './components/AdminPanel';
+import { Toaster } from './components/ui/sonner';
 
 interface Product {
   id: number;
@@ -150,6 +152,7 @@ export default function App() {
   const [infoTab, setInfoTab] = useState('carrinho');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
 
   const addToCart = (product: Product) => {
     setCart(prevCart => {
@@ -188,7 +191,8 @@ export default function App() {
     }, 0);
   };
 
-  const handleConfirmOrder = () => {
+  const handleConfirmOrder = (orderId: string) => {
+    setCurrentOrderId(orderId);
     setCheckoutOpen(false);
     setConfirmationOpen(true);
     setCart([]);
@@ -335,10 +339,10 @@ export default function App() {
           </Tabs>
         </div>
 
-        {/* Info Tabs (Carrinho, Contatos, Localização) */}
+        {/* Info Tabs (Carrinho, Contatos, Localização, Admin) */}
         <div className="mt-12">
           <Tabs value={infoTab} onValueChange={setInfoTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8 bg-white/95 shadow-md">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-8 bg-white/95 shadow-md">
               <TabsTrigger value="carrinho" className="flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" />
                 <span className="hidden sm:inline">Carrinho</span>
@@ -356,6 +360,11 @@ export default function App() {
                 <MapPin className="w-4 h-4" />
                 <span className="hidden sm:inline">Localização</span>
                 <span className="sm:hidden">Local</span>
+              </TabsTrigger>
+              <TabsTrigger value="admin" className="flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Admin</span>
+                <span className="sm:hidden">Admin</span>
               </TabsTrigger>
             </TabsList>
 
@@ -500,6 +509,10 @@ export default function App() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            <TabsContent value="admin">
+              <AdminPanel />
+            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -516,6 +529,7 @@ export default function App() {
         open={checkoutOpen}
         onOpenChange={setCheckoutOpen}
         total={getTotal()}
+        cartItems={cart}
         onConfirm={handleConfirmOrder}
       />
 
@@ -523,7 +537,11 @@ export default function App() {
       <ConfirmationDialog
         open={confirmationOpen}
         onOpenChange={setConfirmationOpen}
+        orderId={currentOrderId}
       />
+
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   );
 }

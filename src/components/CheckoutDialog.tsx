@@ -5,17 +5,29 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Check, CreditCard, Banknote, MapPin } from 'lucide-react';
+import { Check, CreditCard, Banknote, MapPin, Loader2 } from 'lucide-react';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+
+interface CartItem {
+  id: number;
+  name: string;
+  weight: string;
+  price: string;
+  quantity: number;
+}
 
 interface CheckoutDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   total: number;
-  onConfirm: () => void;
+  cartItems: CartItem[];
+  onConfirm: (orderId: string) => void;
 }
 
-export function CheckoutDialog({ open, onOpenChange, total, onConfirm }: CheckoutDialogProps) {
+export function CheckoutDialog({ open, onOpenChange, total, cartItems, onConfirm }: CheckoutDialogProps) {
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -28,6 +40,7 @@ export function CheckoutDialog({ open, onOpenChange, total, onConfirm }: Checkou
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    setError(null);
   };
 
   const handleNext = () => {
@@ -38,18 +51,69 @@ export function CheckoutDialog({ open, onOpenChange, total, onConfirm }: Checkou
     if (step > 1) setStep(step - 1);
   };
 
-  const handleConfirmOrder = () => {
-    onConfirm();
-    setStep(1);
-    setFormData({
-      name: '',
-      phone: '',
-      email: '',
-      address: '',
-      complement: '',
-      paymentMethod: 'dinheiro',
-      deliveryMethod: 'retirada',
-    });
+  const handleConfirmOrder = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const orderData = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        address: formData.address,
+        complement: formData.complement,
+        deliveryMethod: formData.deliveryMethod,
+        paymentMethod: formData.paymentMethod,
+        items: cartItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          weight: item.weight,
+          price: item.price,
+          quantity: item.quantity
+        })),
+        total
+      };
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-27b88f73/orders`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`
+          },
+          body: JSON.stringify(orderData)
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao criar pedido');
+      }
+
+      const result = await response.json();
+      console.log('Order created successfully:', result);
+
+      // Reset form
+      setStep(1);
+      setFormData({
+        name: '',
+        phone: '',
+        email: '',
+        address: '',
+        complement: '',
+        paymentMethod: 'dinheiro',
+        deliveryMethod: 'retirada',
+      });
+
+      onConfirm(result.orderId);
+
+    } catch (err) {
+      console.error('Error creating order:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao finalizar pedido');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -224,12 +288,18 @@ export function CheckoutDialog({ open, onOpenChange, total, onConfirm }: Checkou
                 <span className="text-orange-600">R$ {total.toFixed(2).replace('.', ',')}</span>
               </div>
             </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg">
+                {error}
+              </div>
+            )}
           </div>
         )}
 
         <div className="flex gap-2 mt-6">
           {step > 1 && (
-            <Button variant="outline" onClick={handleBack} className="flex-1">
+            <Button variant="outline" onClick={handleBack} className="flex-1" disabled={loading}>
               Voltar
             </Button>
           )}
@@ -248,8 +318,16 @@ export function CheckoutDialog({ open, onOpenChange, total, onConfirm }: Checkou
             <Button 
               onClick={handleConfirmOrder} 
               className="flex-1 bg-orange-500 hover:bg-orange-600"
+              disabled={loading}
             >
-              Confirmar Pedido
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                'Confirmar Pedido'
+              )}
             </Button>
           )}
         </div>
